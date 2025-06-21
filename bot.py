@@ -127,9 +127,11 @@ def job():
 
 def heartbeat():
     """
-    每分钟执行一次的心跳函数，打印日志防止容器因无输出休眠
+    心跳函数，用于每隔一段时间打印日志，防止容器被平台判定为空闲自动休眠。
+    使用带时区的 UTC 时间打印，避免弃用警告。
     """
-    print(f"{datetime.utcnow()} 心跳：程序仍在运行... 防止容器休眠")
+    now_utc = datetime.now(timezone.utc)  # 获取当前UTC时间，带时区信息
+    print(f"{now_utc} 心跳：程序仍在运行... 防止容器休眠")
 
 if __name__ == "__main__":
     print("机器人启动，等待定时发送...")
