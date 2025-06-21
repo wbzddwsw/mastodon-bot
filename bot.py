@@ -104,8 +104,8 @@ def post_status(content):
             }
         # 发送发帖请求
         r = requests.post(url, headers=headers, data=data)
-        # 打印当前 UTC 时间，响应状态码和返回内容，方便调试
-        print(f"{datetime.utcnow()} 状态码: {r.status_code}")
+        # 打印当前 UTC 时间（带时区），响应状态码和返回内容，方便调试
+        print(f"{datetime.now(timezone.utc)} 状态码: {r.status_code}")
         print(r.text)
     except Exception as e:
         print(f"发帖异常：{e}")
@@ -117,7 +117,7 @@ def job():
     - 如果有内容，调用发帖函数发送
     - 如果没有，打印提示信息
     """
-    print(f"{datetime.utcnow()} 开始执行定时任务")
+    print(f"{datetime.now(timezone.utc)} 开始执行定时任务")
     selected = get_random_content()
     if selected:
         print("将发送：", selected)
@@ -140,13 +140,13 @@ if __name__ == "__main__":
     # 北京时间 = UTC +8小时
     # 所以北京时间 09:00 = UTC 01:00
     # 北京时间 21:00 = UTC 13:00
-    schedule.every().day.at("01:00").do(job)  # UTC 时间 01:00，实际北京时间 09:00
-    schedule.every().day.at("13:00").do(job)  # UTC 时间 13:00，实际北京时间 21:00
+    schedule.every().day.at("01:00").do(job)  # UTC 时间 01:00 -> 北京时间 09:00
+    schedule.every().day.at("13:00").do(job)  # UTC 时间 13:00 -> 北京时间 21:00
 
-    # 每分钟执行一次心跳打印，防止容器因无日志输出被休眠
+    # 每 5 分钟执行一次心跳打印，防止容器因无日志输出被休眠
     schedule.every(5).minutes.do(heartbeat)
 
-    # 主循环，循环执行所有待运行的任务，每秒检测一次
+    # 主循环，持续运行等待任务执行
     while True:
         schedule.run_pending()
         time.sleep(1)
