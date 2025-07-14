@@ -22,7 +22,7 @@ IMAGE_FOLDER = "images"
 def get_random_content():
     """
     随机获取待发送的内容（文字或图片路径）
-    1. 先从文本文件读取非空行，加入候选列表
+    1. 先从文本文件读取非空段落（以空行分隔），加入候选列表
     2. 再从图片文件夹读取所有支持格式的图片路径，加入候选列表
     3. 如果候选列表为空，返回 None
     4. 否则返回随机选中的一条内容
@@ -32,9 +32,10 @@ def get_random_content():
     # 检查文本文件是否存在并读取内容
     if os.path.exists(TEXT_FILE):
         with open(TEXT_FILE, "r", encoding="utf-8") as f:
-            # 读取每一行并去除空白字符，过滤空行
-            lines = [line.strip() for line in f if line.strip()]
-            content_list.extend(lines)
+            # 读取整个文件内容，按两个换行符（空行）分段
+            content = f.read()
+            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+            content_list.extend(paragraphs)
 
     # 检查图片文件夹是否存在并读取支持的图片文件
     if os.path.isdir(IMAGE_FOLDER):
@@ -130,7 +131,7 @@ def heartbeat():
     心跳函数，用于每隔一段时间打印日志，防止容器被平台判定为空闲自动休眠。
     使用带时区的 UTC 时间打印，避免弃用警告。
     """
-    now_utc = datetime.now(timezone.utc)  # 获取当前UTC时间，带时区信息
+    now_utc = datetime.now(timezone.utc)
     print(f"{now_utc} 心跳：程序仍在运行... 防止容器休眠")
 
 if __name__ == "__main__":
