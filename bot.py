@@ -32,9 +32,9 @@ def get_random_content():
     # 检查文本文件是否存在并读取内容
     if os.path.exists(TEXT_FILE):
         with open(TEXT_FILE, "r", encoding="utf-8") as f:
-           # 用两个换行符分割为多段内容（空行分段）
-            paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
-            content_list.extend(paragraphs)
+            # 读取每一行并去除空白字符，过滤空行
+            lines = [line.strip() for line in f if line.strip()]
+            content_list.extend(lines)
 
     # 检查图片文件夹是否存在并读取支持的图片文件
     if os.path.isdir(IMAGE_FOLDER):
