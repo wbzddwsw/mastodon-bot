@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: '0 1 * * *'    # UTC 01:00 = 北京时间 09:00
     - cron: '0 13 * * *'   # UTC 13:00 = 北京时间 21:00
-  workflow_dispatch:       # ✅ 允许手动运行
+  workflow_dispatch:       # 添加这个就可以手动测试了
 
 jobs:
   post:
@@ -19,8 +19,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install requests
-        run: pip install requests
+      - name: Install dependencies
+        run: |
+          pip install requests
+          pip install schedule
 
       - name: Run bot script
         env:
