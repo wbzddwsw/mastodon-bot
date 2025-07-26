@@ -2,8 +2,6 @@ import random
 import requests
 from datetime import datetime, timezone
 import os
-import schedule
-import time
 
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 INSTANCE = os.getenv('INSTANCE_URL')
@@ -84,20 +82,6 @@ def job():
     else:
         print("没有内容发送")
 
-def heartbeat():
-    now_utc = datetime.now(timezone.utc)
-    print(f"{now_utc} 心跳：程序仍在运行... 防止容器休眠")
-
 if __name__ == "__main__":
-    print("机器人启动，等待定时发送...")
-
-    # UTC 01:00 是北京时间 09:00
-    # UTC 13:00 是北京时间 21:00
-    schedule.every().day.at("01:00").do(job)
-    schedule.every().day.at("13:00").do(job)
-
-    schedule.every(5).minutes.do(heartbeat)
-
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    print("机器人启动，执行一次任务后退出...")
+    job()
