@@ -2,76 +2,71 @@ import random
 import requests
 from datetime import datetime, timezone
 import os
+import schedule
+import time
 
-# 从环境变量中读取 Mastodon 访问令牌和实例地址
+# 从环境变量读取 Mastodon 访问令牌和实例地址
 ACCESS_TOKEN = os.getenv('ACCESS_TOKEN')
 INSTANCE = os.getenv('INSTANCE_URL')
 
-# 如果环境变量没有设置，程序会打印提示并退出，防止报错
+# 如果环境变量未设置，则程序退出并提示用户
 if not ACCESS_TOKEN or not INSTANCE:
     print("请设置环境变量 ACCESS_TOKEN 和 INSTANCE_URL")
     exit(1)
 
-# 文本文件路径，里面存放多段文字内容，段落之间用空行分隔
+# 文本内容文件路径（根目录下）
 TEXT_FILE = "sentences.txt"
-# 图片文件夹路径，存放待发送的图片文件
+
+# 图片文件夹路径（根目录下）
 IMAGE_FOLDER = "images"
 
 def get_random_content():
     """
-    随机获取要发送的内容，可以是多段文字或者图片路径
+    随机获取待发送的内容（文字段落或图片路径）
 
-    1. 读取文本文件，按空行分段，每段可以包含多行文本
-    2. 读取图片文件夹，支持 png/jpg/jpeg/gif/webp 格式
-    3. 合并文字段落和图片路径，随机选择一条返回
-    4. 如果没有内容，返回 None
+    逻辑：
+    1. 从sentences.txt读取全文，使用空行（两个换行）分段，每段可以包含多行文字
+    2. 读取images文件夹内所有支持格式的图片路径
+    3. 把文字段落和图片路径混合到一个列表中，随机选一个返回
+    4. 若无内容则返回 None
     """
     content_list = []
 
-    # 读取文本内容（分段）
+    # 读取文本段落
     if os.path.exists(TEXT_FILE):
         with open(TEXT_FILE, "r", encoding="utf-8") as f:
-            # 读取整个文件，按两个换行符分割成段落
             text = f.read()
+            # 以连续两个换行分段，过滤掉空白段落
             paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
             content_list.extend(paragraphs)
 
-    # 读取图片文件路径
+    # 读取图片文件
     if os.path.isdir(IMAGE_FOLDER):
-        for filename in os.listdir(IMAGE_FOLDER):
-            if filename.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
-                full_path = os.path.join(IMAGE_FOLDER, filename)
-                content_list.append(full_path)
+        for file in os.listdir(IMAGE_FOLDER):
+            if file.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".webp")):
+                content_list.append(os.path.join(IMAGE_FOLDER, file))
 
-    # 如果没有任何内容，返回 None
     if not content_list:
         print("没有可发送的文字或图片。")
         return None
 
-    # 随机选择一条内容返回
+    # 返回随机选中的一条
     return random.choice(content_list)
 
 def upload_media(image_path):
     """
-    上传图片到 Mastodon 媒体库，返回媒体 ID 供发帖时使用
-
-    - image_path: 本地图片文件路径
-    - 成功返回媒体 ID（字符串）
-    - 失败打印错误返回 None
+    上传图片到 Mastodon 实例，返回媒体 ID
     """
     url = f"{INSTANCE}/api/v2/media"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
+    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     try:
-        with open(image_path, "rb") as img_file:
-            files = {"file": img_file}
+        with open(image_path, "rb") as img:
+            files = {"file": img}
             response = requests.post(url, headers=headers, files=files)
         if response.status_code == 200:
-            media_id = response.json().get("id")
-            return media_id
+            return response.json()["id"]
         else:
-            print(f"图片上传失败，状态码 {response.status_code}，内容: {response.text}")
+            print(f"图片上传失败：{response.text}")
             return None
     except Exception as e:
         print(f"上传图片异常：{e}")
@@ -79,51 +74,55 @@ def upload_media(image_path):
 
 def post_status(content):
     """
-    发送帖子
-
-    - 如果 content 是图片路径，先上传图片获得媒体 ID，再发一条只带图片的帖子
-    - 如果是文字内容，直接发带文字的帖子
-    - 打印发送状态和返回内容，方便调试
+    发帖函数
+    - 如果是图片路径，先上传图片，成功后发空文字带图片帖子
+    - 如果是文字段落，直接发带文字的帖子
     """
     url = f"{INSTANCE}/api/v1/statuses"
-    headers = {
-        "Authorization": f"Bearer {ACCESS_TOKEN}"
-    }
+    headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
     try:
         if os.path.isfile(content):
-            # 如果是图片文件，先上传
             media_id = upload_media(content)
             if not media_id:
-                print("上传图片失败，跳过发帖")
                 return
-            data = {
-                "status": "",           # 只发图片，不带文字
-                "media_ids[]": [media_id]
-            }
+            data = {"status": "", "media_ids[]": [media_id]}
         else:
-            # 普通文字发帖
-            data = {
-                "status": content
-            }
-        response = requests.post(url, headers=headers, data=data)
-        print(f"{datetime.now(timezone.utc)} 状态码: {response.status_code}")
-        print(response.text)
+            data = {"status": content}
+        r = requests.post(url, headers=headers, data=data)
+        print(f"{datetime.now(timezone.utc)} 状态码: {r.status_code}")
+        print(r.text)
     except Exception as e:
         print(f"发帖异常：{e}")
 
-def main():
+def job():
     """
-    主程序入口，获取随机内容并发帖
+    定时任务执行函数
     """
-    now = datetime.now(timezone.utc)
-    print(f"{now} - 开始执行发帖任务")
-
-    content = get_random_content()
-    if content:
-        print("选中内容：", content)
-        post_status(content)
+    print(f"{datetime.now(timezone.utc)} 开始执行定时任务")
+    selected = get_random_content()
+    if selected:
+        print("将发送：", selected)
+        post_status(selected)
     else:
-        print("无可用内容，跳过发帖")
+        print("没有内容发送")
+
+def heartbeat():
+    """
+    心跳函数，防止容器休眠
+    """
+    now_utc = datetime.now(timezone.utc)
+    print(f"{now_utc} 心跳：程序仍在运行... 防止容器休眠")
 
 if __name__ == "__main__":
-    main()
+    print("机器人启动，等待定时发送...")
+
+    # 服务器是 UTC 时间，北京时间 = UTC + 8 小时
+    # 所以北京时间09:00对应UTC 01:00，21:00对应UTC 13:00
+    schedule.every().day.at("01:00").do(job)  # 北京时间09:00
+    schedule.every().day.at("13:00").do(job)  # 北京时间21:00
+
+    schedule.every(5).minutes.do(heartbeat)  # 每5分钟心跳一次
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
